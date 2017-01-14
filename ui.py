@@ -74,6 +74,7 @@ class Screen(object):
         self.date = DatePanel(self.side_panel_width)
         self.tax = TaxPanel(self.side_panel_width)
         self.finance = FinancePanel(self.width)
+        self.bank = BankPanel(self.width, self.height)
 
         self.options = {
             curses.KEY_F1: self.show_bank,
@@ -81,7 +82,6 @@ class Screen(object):
             curses.KEY_F3: self.show_exchange,
             # curses.KEY_F4: self.show_property,
             # curses.KEY_F9: self.show_secretary,
-            # curses.KEY_EXIT: curses.endwin,
         }
 
     def draw_event_window(self):
@@ -91,12 +91,8 @@ class Screen(object):
         return wind
 
     def show_bank(self):
-        wind = self.draw_event_window()
-        height, width = wind.getmaxyx()
-        s = 'Вы попали в банк'
-        wind.addstr(height // 2, width // 2 - len(s) // 2, s)
-        wind.refresh()
-        time.sleep(2)
+        self.bank.draw()
+        self.bank.draw_choice()
 
     def show_market(self):
         wind = self.draw_event_window()
@@ -149,16 +145,20 @@ class MenuPanel(object):
         self.draw()
 
     def draw(self):
-        menu = curses.newwin(2, self.main.width - 4, self.main.height - 2, 2)
+        count_len = 0
+        for key in self.options:
+            count_len += len(key) + 1 + len(self.options[key]) + 1
+        menu = curses.newwin(1, count_len + 4, self.main.height - 1, self.main.width // 2 - count_len // 2)
         menu.bkgd(' ', curses.color_pair(2))
         y = 0
-        x = 0
-        for opt in self.options:
-            key = '%s' % (opt)
-            name = '-%s' % (self.options[opt])
-            menu.addstr(y, x, key, curses.color_pair(3))
-            menu.addstr(y, x + len(key), name)
-            x += len(key) + len(name) + 1
+        x = 2
+        for key in self.options:
+            s = '%s' % (key)
+            menu.addstr(y, x, s, curses.color_pair(3))
+            x += len(s)
+            s = ':%s ' % (self.options[key])
+            menu.addstr(y, x, s)
+            x += len(s)
         menu.refresh()
 
 
@@ -203,10 +203,10 @@ class TaxPanel(Observer):
         deposit_rate_str = 'Процент под долг: %s' % self.deposit_rate
         income_tax_str = 'Подоходный налог: %s' % self.income_tax
         replacement_cost_str = 'ВС: %s' % self.replacement_cost
-        self.panel.addstr(1, 1, loan_rate_str)
-        self.panel.addstr(2, 1, deposit_rate_str)
-        self.panel.addstr(3, 1, income_tax_str)
-        self.panel.addstr(4, 1, replacement_cost_str)
+        self.panel.addstr(1, 2, loan_rate_str)
+        self.panel.addstr(2, 2, deposit_rate_str)
+        self.panel.addstr(3, 2, income_tax_str)
+        self.panel.addstr(4, 2, replacement_cost_str)
         self.panel.refresh()
 
     def update(self, msg):
@@ -246,6 +246,74 @@ class FinancePanel(object):
         self.panel.refresh()
 
 
+class BankPanel(object):
+
+    def __init__(self, main_width, main_height):
+        self.panel = curses.newwin(main_height // 2, main_width - 8, main_height // 2 - 4, 4)
+        self.plus = {1: 10000, 4: 12000, 7: 11000, 12: 4000}
+        self.minus = {6: 5000}
+
+    def draw(self):
+        self.panel.clear()
+        self.panel.bkgd(' ', curses.color_pair(1))
+        self.panel.box(curses.ACS_VLINE, curses.ACS_HLINE)
+        height, width = self.panel.getmaxyx()
+        bank_name = ' Банк Ivanov & Co. '
+        self.panel.addstr(0, width // 2 - len(bank_name) // 2, bank_name)
+        self.panel.addstr(2, 1, '+')
+        self.panel.addstr(3, 1, '+')
+        self.panel.addstr(4, 1, '-')
+        self.panel.addstr(5, 1, '-')
+        m = 1
+        for i in range(5, width, width // 6):
+            self.panel.addstr(1, i, str(m))
+
+            def row(month, plus=True):
+                if plus:
+                    if month <= 6:
+                        return 2
+                    return 3
+                else:
+                    if month <= 6:
+                        return 4
+                    return 5
+
+            if m in self.plus or m + 6 in self.plus:
+                for month, money in self.plus.items():
+                    if month % 6 == m:
+                        self.panel.addstr(row(month), i, str(self.plus[month]))
+                    elif month % 6 == 0 and m == 6:
+                        self.panel.addstr(row(month), i, str(self.plus[month]))
+            else:
+                self.panel.addstr(2, i, str(0))
+                self.panel.addstr(3, i, str(0))
+
+            if m in self.minus or m + 6 in self.minus:
+                for month, money in self.minus.items():
+                    if month % 6 == m:
+                        self.panel.addstr(row(month, False), i, str(self.minus[month]))
+                    elif month % 6 == 0 and m == 6:
+                        self.panel.addstr(row(month, False), i, str(self.minus[month]))
+            else:
+                self.panel.addstr(4, i, str(0))
+                self.panel.addstr(5, i, str(0))
+            m += 1
+        self.panel.refresh()
+
+    def draw_choice(self):
+        height, width = self.panel.getmaxyx()
+        title = 'Вы хотите'
+        question = 'взять [1] или дать [0] деньги под проценты?'
+        choice_panel = self.panel.derwin(5, len(question) + 2, height // 2, width // 2 - len(question) // 2)
+        choice_panel.clear()
+        choice_panel.box(curses.ACS_VLINE, curses.ACS_HLINE)
+        height, width = choice_panel.getmaxyx()
+        choice_panel.addstr(0, width // 2 - len(title) // 2, title)
+        choice_panel.addstr(2, width // 2 - len(question) // 2, question)
+        self.panel.refresh()
+        choice_panel.refresh()
+
+
 if __name__ == '__main__':
     date_counter = DateCounter()
     current_date = DATE
@@ -260,5 +328,8 @@ if __name__ == '__main__':
         key = screen.screen.getch()
         if key in screen.options:
             screen.options[key]()
-        count -= 1
+        elif key == 27:
+            count = 0
+        else:
+            count -= 1
     curses.endwin()
