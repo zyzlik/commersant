@@ -1,5 +1,7 @@
 # -*- encoding: utf8 -*-
 
+from datetime import date
+
 
 def human_money(n):
     variants = {
@@ -15,3 +17,7 @@ def human_money(n):
         return variants[2]
     else:
         return variants['rest']
+
+
+def construct_date(day=1, month=1, year=2017):
+    return date(year, month, day)
