@@ -8,6 +8,7 @@ from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 from datetime import date, timedelta
 
+from menu import Menu, MultipleMenu
 from observer import Observable, Observer
 from utils import human_money, construct_date
 
@@ -122,6 +123,15 @@ class Market(Observer):
         self.update_apartments()
         self.update_cars()
 
+    def _count_max_width(self, product_dict):
+        return max(len(i) for i in product_dict)
+
+    def count_cars_width(self):
+        return self._count_max_width(self.cars)
+
+    def count_apts_width(self):
+        return self._count_max_width(self.apartments)
+
     def update(self, date):
         if date.day == 1:
             self.update_cars()
@@ -219,16 +229,14 @@ class User(Observer):
                 amount += money
         return amount
 
-    def buy_car(self, car):
-        price = self.market.cars[car]['price']
+    def buy_car(self, car, price):
         if price < self.total_money:
             self.total_money -= price
             self.property['car'] = car
             return True
         return False
 
-    def buy_apartment(self, apt):
-        price = self.market.apartments[apt]['price']
+    def buy_apartment(self, apt, price):
         if price < self.total_money:
             self.total_money -= price
             self.property['apt'] = apt
@@ -472,6 +480,18 @@ class BankChoicePanel(Panel):
         )
 
 
+class MarketMenu(Menu):
+    bg_color = curses.COLOR_BLUE
+    fg_color = curses.COLOR_BLACK
+    highlighted_bg_color = curses.COLOR_WHITE
+    highlighted_fg_color = curses.COLOR_BLACK
+
+
+class MarketAptMenu(MarketMenu):
+    activate_btn = curses.KEY_RIGHT
+    deactivate_btn = curses.KEY_LEFT
+
+
 class MarketPanel(Panel):
 
     def __init__(self, parent, height, width, begin_y, begin_x, *args, **kwargs):
@@ -481,6 +501,45 @@ class MarketPanel(Panel):
         self.market = Market()
         self.car_pos = 1
         self.apt_pos = 0
+
+    @staticmethod
+    def _parse_item_string(s):
+        name, price = s.split()
+        return name, int(price)
+
+    def success(self):
+        title = "Продавец-консультант"
+        message = "Поздравляем с покупкой!"
+        self.panel.clear()
+        self.panel.box(curses.ACS_VLINE, curses.ACS_HLINE)
+        self.panel.addstr("")
+        self.panel.bkgd(' ', curses.color_pair(6))
+        self.panel.addstr(
+            0, self.width // 2 - len(title) // 2, title, curses.color_pair(5)
+        )
+        self.panel.addstr(
+            self.height // 2 - 1, self.width // 2 - len(message) // 2, message, curses.color_pair(5)
+        )
+        key = self.panel.getch()
+        if key:
+            self.hide()
+
+    def failure(self):
+        title = " Продавец-консультант "
+        message = "Без денег не продаем!"
+        self.panel.clear()
+        self.panel.box(curses.ACS_VLINE, curses.ACS_HLINE)
+        self.panel.addstr("")
+        self.panel.bkgd(' ', curses.color_pair(6))
+        self.panel.addstr(
+            0, self.width // 2 - len(title) // 2, title, curses.color_pair(5)
+        )
+        self.panel.addstr(
+            self.height // 2 - 1, self.width // 2 - len(message) // 2, message, curses.color_pair(5)
+        )
+        key = self.panel.getch()
+        if key:
+            self.hide()
 
     def add_content(self):
         self.panel.clear()
@@ -496,29 +555,37 @@ class MarketPanel(Panel):
         self.panel.addstr(
             1, self.width - 10 - len(table_headers[1]), table_headers[1], curses.color_pair(7)
         )
-        for i, car in enumerate(self.market.cars, 1):
-            if i == self.car_pos:
-                color = curses.color_pair(8)
-            else:
-                color = curses.color_pair(5)
-            self.panel.addstr(
-                2 + i, 2, '%s. %s' % (i, car), color
-            )
-            self.panel.addstr(
-                2 + i, 15, ' - ' + str(self.market.cars[car]['price']), color
-            )
 
-        for i, apt in enumerate(self.market.apartments, 1):
-            if i == self.car_pos:
-                color = curses.color_pair(8)
-            else:
-                color = curses.color_pair(5)
-            self.panel.addstr(
-                2 + i, self.width - 18, apt, color
-            )
-            self.panel.addstr(
-                2 + i, self.width - 11, ' - ' + str(self.market.apartments[apt]['price']), color
-            )
+        # Make strings for menu
+        max_width = max(self.market.count_apts_width(), self.market.count_cars_width())
+        cars_items = tuple('{car:<{max_width}}{price:>6}'.format(
+            car=car,
+            max_width=max_width,
+            price = self.market.cars[car]['price']
+        ) for car in self.market.cars)
+        apts_items = tuple('{apt:<{max_width}}{price:>6}'.format(
+            apt=apt,
+            max_width=max_width,
+            price=self.market.apartments[apt]['price']
+        ) for apt in self.market.apartments)
+        # Instantiate menus
+        car_menu = MarketMenu(cars_items, self.panel, 3, 2)
+        apt_menu = MarketAptMenu(apts_items, self.panel, 3, self.width // 2 + 4, active=False)
+        menus = MultipleMenu((car_menu, apt_menu))
+        # Get result
+        res, menu = menus.start()
+        item, price = self._parse_item_string(menu.items[res])
+
+        if item in self.market.cars:
+            bought = self.user.buy_car(item, price)
+
+        if item in self.market.apartments:
+            bought = self.user.buy_apartment(item, price)
+        if bought:
+            self.success()
+        else:
+            self.failure()
+
 
 class Screen(Observer):
 
@@ -556,7 +623,7 @@ class Screen(Observer):
             self, self.height // 2, self.width - 8, self.height // 2 - 4, 4, user=self.user
         )
         self.market = MarketPanel(
-            self, self.height // 2 + 2, self.width - 30, self.height // 2 - 4, 15, user=self.user
+            self, 12, self.width - 30, self.height // 2 - 4, 15, user=self.user
         )
 
         self.panels.append(self.menu)
