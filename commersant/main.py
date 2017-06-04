@@ -507,9 +507,8 @@ class MarketPanel(Panel):
         name, price = s.split()
         return name, int(price)
 
-    def success(self):
+    def purchase_response(self, response):
         title = "Продавец-консультант"
-        message = "Поздравляем с покупкой!"
         self.panel.clear()
         self.panel.box(curses.ACS_VLINE, curses.ACS_HLINE)
         self.panel.addstr("")
@@ -518,28 +517,8 @@ class MarketPanel(Panel):
             0, self.width // 2 - len(title) // 2, title, curses.color_pair(5)
         )
         self.panel.addstr(
-            self.height // 2 - 1, self.width // 2 - len(message) // 2, message, curses.color_pair(5)
+            self.height // 2 - 1, self.width // 2 - len(response) // 2, response, curses.color_pair(5)
         )
-        key = self.panel.getch()
-        if key:
-            self.hide()
-
-    def failure(self):
-        title = " Продавец-консультант "
-        message = "Без денег не продаем!"
-        self.panel.clear()
-        self.panel.box(curses.ACS_VLINE, curses.ACS_HLINE)
-        self.panel.addstr("")
-        self.panel.bkgd(' ', curses.color_pair(6))
-        self.panel.addstr(
-            0, self.width // 2 - len(title) // 2, title, curses.color_pair(5)
-        )
-        self.panel.addstr(
-            self.height // 2 - 1, self.width // 2 - len(message) // 2, message, curses.color_pair(5)
-        )
-        key = self.panel.getch()
-        if key:
-            self.hide()
 
     def add_content(self):
         self.panel.clear()
@@ -581,10 +560,11 @@ class MarketPanel(Panel):
 
         if item in self.market.apartments:
             bought = self.user.buy_apartment(item, price)
+
         if bought:
-            self.success()
+            self.purchase_response(' Поздравляем с покупкой! ')
         else:
-            self.failure()
+            self.purchase_response(' Без денег не продаем! ')
 
 
 class Screen(Observer):
@@ -649,12 +629,10 @@ class Screen(Observer):
             self.panels.remove(panel)
             panel.hide()
         self.update_panels()
-        self.panel.refresh()
 
     def enable_panel(self, panel):
         self.panels.append(panel)
         self.update_panels()
-        self.panel.refresh()
 
     def update_panels(self):
         for panel in self.panels:
@@ -692,6 +670,10 @@ class Screen(Observer):
         self.enable_panel(self.market)
         self.panel.nodelay(NO)
         key = self.panel.getch()
+        if key:
+            curses.noecho()
+            self.disable_panel(self.market)
+        self.panel.nodelay(YES)
 
 
 def main(stdscr):
