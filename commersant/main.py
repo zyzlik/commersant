@@ -165,6 +165,7 @@ class User(Observer):
         self.bank = Bank()
         self.market = Market()
         self.date = None
+        self.profit = 0
 
     def update(self, date):
         # If day is the day of your deposit, it is time to adjust percents
@@ -180,12 +181,18 @@ class User(Observer):
             self.get_payment(date)
         if date in self.loans:
             self.pay_loan(date)
+        if date.day == 1:
+            self.profit = 0
 
     def get_payment(self, date):
-        self.total_money += self.deposits.pop(date)
+        payment = self.deposits.pop(date)
+        self.total_money += payment
+        self.profit += payment
 
     def pay_loan(self, date):
-        self.total_money -= self.loans.pop(date)
+        payment = self.loans.pop(date)
+        self.total_money -= payment
+        self.profit -= payment
 
     def new_deposit(self, amount, term):
         if amount < self.total_money:
@@ -197,6 +204,7 @@ class User(Observer):
             return_date = construct_date(self.date.day, month, year)
             self.deposits.update({return_date: amount})
             self.total_money -= amount
+            self.profit -= amount
             return True
         else:
             return False
@@ -211,6 +219,7 @@ class User(Observer):
             return_date = construct_date(self.date.day, month, year)
             self.loans.update({return_date: amount})
             self.total_money += amount
+            self.profit += amount
             return True
         else:
             return False
@@ -232,6 +241,7 @@ class User(Observer):
     def buy_car(self, car, price):
         if price < self.total_money:
             self.total_money -= price
+            self.profit -= price
             self.property['car'] = car
             return True
         return False
@@ -239,6 +249,7 @@ class User(Observer):
     def buy_apartment(self, apt, price):
         if price < self.total_money:
             self.total_money -= price
+            self.profit -= price
             self.property['apt'] = apt
             return True
         return False
@@ -313,7 +324,6 @@ class FinancePanel(Observer, Panel):
     def __init__(self, parent, height, width, begin_y, begin_x, *args, **kwargs):
         super(FinancePanel, self).__init__(parent, height, width, begin_y, begin_x, *args, **kwargs)
         self.user = kwargs.get('user')
-        self.month_income = INITIAL_INCOME
         self.house_rate = INITIAL_HOUSE_RATE
         self.land_rate = INITIAL_LAND_RATE
 
@@ -331,7 +341,7 @@ class FinancePanel(Observer, Panel):
         loan_str = 'Вы должны: %s %s' % (
             sum(self.user.loans.values()), human_money(sum(self.user.loans.values())))
         month_income_str = 'Итого прибыль: %s %s' % (
-            self.month_income, human_money(self.month_income))
+            self.user.profit, human_money(self.user.profit))
         house_rate_str = 'Плата за дом: %s%%' % self.house_rate
         land_rate_str = 'Плата за землю: %s%%' % self.land_rate
         self.panel.addstr(1, 2, money_str)
