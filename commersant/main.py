@@ -664,14 +664,20 @@ class StackExchangePanel(Panel, Observer):
         elif key == KEY_N:
             self.panel.addstr(9, 1, "Сколько баррелей: ", curses.color_pair(9) | curses.A_BOLD)
             self.ask_for_oil()
+        else:
+            self.wait_for_key()
 
     def not_enough_money(self):
         title = " Простите "
-        message = " У вас нет столько денег "
-        win = self.panel.derwin(4, len(message) + 2, self.height // 2 - 2, self.width // 2 - len(message) // 2)
-        win.addstr(0, self.width // 2 - len(title) // 2, title)
-        win.addstr(2, self.width // 2 - len(message) // 2, message)
-        win.touch()
+        message = "У вас нет столько денег"
+        width = len(message) + 7
+        height = 5
+        win = self.panel.derwin(height, width, self.height // 2 - height // 2, self.width // 2 - width // 2)
+        win.clear()
+        win.box(curses.ACS_VLINE, curses.ACS_HLINE)
+        win.addstr(0, width // 2 - len(title) // 2, title)
+        win.addstr(2, width // 2 - len(message) // 2, message)
+        win.keypad(1)
         key = win.getch()
         if key:
             return
