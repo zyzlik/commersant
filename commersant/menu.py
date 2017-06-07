@@ -11,7 +11,8 @@ class Menu(object):
     fg_color = curses.COLOR_WHITE
     highlighted_bg_color = curses.COLOR_WHITE
     highlighted_fg_color = curses.COLOR_BLACK
-    deactivate_btn = curses.KEY_RIGHT
+    deactivate_key = curses.KEY_RIGHT
+    exit_key = 27
 
     def __init__(self, items, screen, begin_y, begin_x, active=True):
         self.items = items
@@ -71,10 +72,14 @@ class Menu(object):
             elif key == curses.KEY_DOWN and self.active:
                 self._item_down()
                 self.draw()
-            elif key == self.deactivate_btn and self.active:
+            elif key == self.deactivate_key and self.active:
                 self.deactivate()
                 self.draw()
                 return
+            elif key == self.exit_key:
+                self.deactivate()
+                self.draw()
+                return -1
         return self.pos
 
     def activate(self):
@@ -120,7 +125,9 @@ def _main(stdscr):
     menu2 = Menu(items2, stdscr, height // 2, width // 2 + 10, active=False)
     menus = MultipleMenu((menu1, menu2))
     res, menu = menus.start()
-    if res is not None:
+    if res == -1:
+        stdscr.addstr(0, 0, 'Вышли с концами!')
+    elif res is not None:
         stdscr.addstr(0, 0, 'Вы выбрали %s' % menu.items[res])
     else:
         stdscr.addstr(0, 0, 'Меню не активно')

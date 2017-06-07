@@ -32,6 +32,8 @@ INITIAL_HOUSE_RATE = 10
 KEY_0 = 48
 KEY_1 = 49
 KEY_ESC = 27
+KEY_Z = 122
+KEY_N = 110
 
 MENU_OPTIONS = OrderedDict([
     ('F1', 'Банк'),
@@ -41,6 +43,9 @@ MENU_OPTIONS = OrderedDict([
     ('F9', 'Секретарь'),
     ('ESC', 'Выход'),
 ])
+
+OIL_PRICE_RANGE = (15, 40)
+LAND_PRICE_RANGE = (150, 450)
 
 
 class Panel(metaclass=ABCMeta):
@@ -155,8 +160,8 @@ class User(Observer):
         self.property = {
             'apt': 'Живу у мамы',
             'car': None,
-            'oil': None,
-            'land': None,
+            'oil': 0,
+            'land': 0,
         }
         self.marriage = False
         self.sick = False
@@ -251,6 +256,29 @@ class User(Observer):
             self.total_money -= price
             self.profit -= price
             self.property['apt'] = apt
+            return True
+        return False
+
+    def buy_oil(self, amount, price):
+        total_price = amount * price
+        if total_price < self.total_money:
+            self.total_money -= total_price
+            self.profit -= total_price
+            self.property['oil'] += amount
+            return True
+        return False
+
+    def buy_land(self, amount, price):
+        total_price = amount * price
+        if total_price < self.total_money:
+            self.total_money -= total_price
+            self.profit -= total_price
+            self.property['land'] += amount
+            return True
+        return False
+
+    def is_enough_money(self, amount):
+        if self.total_money > amount:
             return True
         return False
 
@@ -563,6 +591,8 @@ class MarketPanel(Panel):
         menus = MultipleMenu((car_menu, apt_menu))
         # Get result
         res, menu = menus.start()
+        if res == -1:
+            return
         item, price = self._parse_item_string(menu.items[res])
 
         if item in self.market.cars:
@@ -576,6 +606,108 @@ class MarketPanel(Panel):
         else:
             self.purchase_response(' Без денег не продаем! ')
 
+
+class StackExchangePanel(Panel, Observer):
+    oil_price = 0
+    land_price = 0
+    prices = [None] * 12
+    open = True
+
+    def __init__(self, parent, height, width, begin_y, begin_x, *args, **kwargs):
+        super(StackExchangePanel, self).__init__(parent, height, width, begin_y, begin_x, *args, **kwargs)
+        self.user = kwargs.get('user')
+        self.update_prices(DATE.month)
+
+    def update_oil(self, increment=None):
+        if increment is None:
+            self.oil_price = random.randrange(*OIL_PRICE_RANGE)
+
+    def update_land(self, increment=None):
+        if increment is None:
+            self.land_price = random.randrange(*LAND_PRICE_RANGE)
+
+    def update_prices(self, month):
+        self.update_oil()
+        self.update_land()
+        self.prices[month - 1] = (self.oil_price, self.land_price)
+
+    def add_content(self):
+        self.panel.clear()
+        self.panel.box(curses.ACS_VLINE, curses.ACS_HLINE)
+        self.panel.bkgd(' ', curses.color_pair(6))
+        title = ' Биржа '
+        self.panel.addstr(0, self.width // 2 - len(title) // 2, title, curses.color_pair(5) | curses.A_BOLD)
+        for month, coord in enumerate(range(5, self.width - 5, (self.width - 5) // 12 )):
+            self.panel.addstr(1, coord, str(month + 1), curses.color_pair(1))
+            if self.prices[month] is not None:
+                self.panel.addstr(2, coord, str(self.prices[month][1]), curses.color_pair(5))
+                self.panel.addstr(3, coord, '{:>3}'.format(self.prices[month][0]), curses.color_pair(5))
+        self.panel.addstr(4, 1, '_' * (self.width - 10), curses.color_pair(5))
+        self.panel.addstr(
+            5, 1, 'Z. Земля   -   {} за акр'.format(self.land_price), curses.color_pair(9) | curses.A_BOLD
+        )
+        self.panel.addstr(
+            6, 1, 'N. Нефть   -   {} за баррель'.format(self.oil_price), curses.color_pair(9) | curses.A_BOLD
+        )
+        self.panel.addstr(
+            8, 1, 'ESC - выход без покупки; Z, N - покупка', curses.color_pair(9) | curses.A_BOLD
+        )
+        self.wait_for_key()
+
+    def wait_for_key(self):
+        key = self.panel.getch()
+        if key == KEY_ESC:
+            return
+        elif key == KEY_Z:
+            self.panel.addstr(9, 1, "Сколько акров: ", curses.color_pair(9) | curses.A_BOLD)
+            self.ask_for_land()
+        elif key == KEY_N:
+            self.panel.addstr(9, 1, "Сколько баррелей: ", curses.color_pair(9) | curses.A_BOLD)
+            self.ask_for_oil()
+
+    def not_enough_money(self):
+        title = " Простите "
+        message = " У вас нет столько денег "
+        win = self.panel.derwin(4, len(message) + 2, self.height // 2 - 2, self.width // 2 - len(message) // 2)
+        win.addstr(0, self.width // 2 - len(title) // 2, title)
+        win.addstr(2, self.width // 2 - len(message) // 2, message)
+        win.touch()
+        key = win.getch()
+        if key:
+            return
+
+    def ask_for_land(self):
+        curses.echo()
+        amount = self.panel.getstr()
+        if self.validate_int(amount) and self.user.is_enough_money(int(amount) * self.land_price):
+            self.user.buy_land(int(amount), self.land_price)
+            curses.noecho()
+        else:
+            curses.noecho()
+            self.not_enough_money()
+            return
+
+    def ask_for_oil(self):
+        curses.echo()
+        amount = self.panel.getstr()
+        if self.validate_int(amount) and self.user.is_enough_money(int(amount) * self.oil_price):
+            self.user.buy_oil(int(amount), self.oil_price)
+            curses.noecho()
+        else:
+            curses.noecho()
+            self.not_enough_money()
+            return
+
+    def validate_int(self, amount):
+        if amount.isdigit():
+            return True
+        return False
+
+    def update(self, date):
+        if date.month == 1 and date.day == 1:
+            self.prices.clear()
+        if date.day == 1:
+            self.update_prices(date.month)
 
 class Screen(Observer):
 
@@ -596,6 +728,7 @@ class Screen(Observer):
         curses.init_pair(6, curses.COLOR_CYAN, curses.COLOR_BLUE)
         curses.init_pair(7, curses.COLOR_MAGENTA, curses.COLOR_BLUE)
         curses.init_pair(8, curses.COLOR_BLACK, curses.COLOR_WHITE)
+        curses.init_pair(9, curses.COLOR_YELLOW, curses.COLOR_BLUE)
 
         self.panels = []
 
@@ -615,6 +748,9 @@ class Screen(Observer):
         self.market = MarketPanel(
             self, 12, self.width - 30, self.height // 2 - 4, 15, user=self.user
         )
+        self.stack_exchange = StackExchangePanel(
+            self, 11, self.width - 12, self.height // 2 - 5, 6, user=self.user
+        )
 
         self.panels.append(self.menu)
         self.panels.append(self.date)
@@ -626,7 +762,7 @@ class Screen(Observer):
         self.options = {
             curses.KEY_F1: self.show_bank,
             curses.KEY_F2: self.show_market,
-            curses.KEY_F3: [self.enable_panel, self.menu],
+            curses.KEY_F3: self.show_stack_exchange,
             # curses.KEY_F4: self.show_property,
             # curses.KEY_F9: self.show_secretary,
         }
@@ -679,11 +815,17 @@ class Screen(Observer):
     def show_market(self):
         self.enable_panel(self.market)
         self.panel.nodelay(NO)
-        key = self.panel.getch()
-        if key:
-            curses.noecho()
-            self.disable_panel(self.market)
+        curses.noecho()
+        self.disable_panel(self.market)
         self.panel.nodelay(YES)
+
+    def show_stack_exchange(self):
+        self.enable_panel(self.stack_exchange)
+        self.panel.nodelay(NO)
+        curses.noecho()
+        self.disable_panel(self.stack_exchange)
+        self.panel.nodelay(YES)
+
 
 
 def main(stdscr):
@@ -697,6 +839,7 @@ def main(stdscr):
     date_counter.register(screen.user)
     date_counter.register(screen.user.bank)
     date_counter.register(screen.finance)
+    date_counter.register(screen.stack_exchange)
     date_counter.register(screen)
     while True:
         time.sleep(1)
