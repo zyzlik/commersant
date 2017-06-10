@@ -1,6 +1,5 @@
 # -*- encoding: utf8 -*-
 
-import curses
 import random
 import time
 

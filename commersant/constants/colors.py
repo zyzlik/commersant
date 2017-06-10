@@ -4,7 +4,6 @@ import curses
 
 
 # Constants format: FOREGROUND_BACKGROUND
-
 BLACK_BLUE = 1
 BLACK_WHITE = 2
 RED_WHITE = 3

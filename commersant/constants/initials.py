@@ -8,7 +8,6 @@ DATE = date(2017, 1, 1)
 TIMEDELTA = timedelta(days=1)
 
 # Rates
-
 INITIAL_DEPOSIT_RATE = 8
 INITIAL_HOUSE_RATE = 10
 INITIAL_INCOME = 0
