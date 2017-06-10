@@ -20,4 +20,16 @@ def human_money(n):
 
 
 def construct_date(day=1, month=1, year=2017):
-    return date(year, month, day)
+    try:
+        return date(year, month, day)
+    except ValueError:
+        day -= 1
+        return construct_date(day=day, month=month, year=year)
+
+
+def validate_int(i):
+    return i.isdigit()
+
+
+def validate_month(month):
+    return 12 >= int(month) > 0

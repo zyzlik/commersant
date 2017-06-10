@@ -10,7 +10,7 @@ from datetime import date, timedelta
 
 from menu import Menu, MultipleMenu
 from observer import Observable, Observer
-from utils import human_money, construct_date
+from utils import human_money, construct_date, validate_int, validate_month
 
 
 DATE = date(2017, 1, 1)
@@ -34,6 +34,8 @@ KEY_1 = 49
 KEY_ESC = 27
 KEY_Z = 122
 KEY_N = 110
+KEY_D = 100
+KEY_A = 97
 
 MENU_OPTIONS = OrderedDict([
     ('F1', 'Банк'),
@@ -46,6 +48,8 @@ MENU_OPTIONS = OrderedDict([
 
 OIL_PRICE_RANGE = (15, 40)
 LAND_PRICE_RANGE = (150, 450)
+
+HEAT_RANGE = (2, 16)
 
 
 class Panel(metaclass=ABCMeta):
@@ -159,9 +163,19 @@ class User(Observer):
         self.total_money = 30000
         self.property = {
             'apt': 'Живу у мамы',
-            'car': None,
+            'car': '-',
             'oil': 0,
             'land': 0,
+        }
+        self.oil_benefit = {
+            'bought': 0,
+            'sold': 0,
+            'benefit': 0
+        }
+        self.land_benefit = {
+            'bought': 0,
+            'sold': 0,
+            'benefit': 0
         }
         self.marriage = False
         self.sick = False
@@ -171,6 +185,7 @@ class User(Observer):
         self.market = Market()
         self.date = None
         self.profit = 0
+        self.birthday = construct_date(day=random.randrange(1,31), month=random.randrange(1,12), year=1990)
 
     def update(self, date):
         # If day is the day of your deposit, it is time to adjust percents
@@ -265,6 +280,8 @@ class User(Observer):
             self.total_money -= total_price
             self.profit -= total_price
             self.property['oil'] += amount
+            self.oil_benefit['bought'] += amount
+            self.oil_benefit['benefit'] -= total_price
             return True
         return False
 
@@ -274,8 +291,38 @@ class User(Observer):
             self.total_money -= total_price
             self.profit -= total_price
             self.property['land'] += amount
+            self.land_benefit['bought'] += amount
+            self.land_benefit['benefit'] -= total_price
             return True
         return False
+
+    def sell_land(self, amount, price):
+        total_money = amount * price
+        self.total_money += total_money
+        self.profit += total_money
+        self.property['land'] -= amount
+        self.land_benefit['sold'] += amount
+        self.land_benefit['benefit'] += total_money
+
+    def sell_oil(self, amount, price):
+        total_money = amount * price
+        self.total_money += total_money
+        self.profit += total_money
+        self.property['oil'] -= amount
+        self.oil_benefit['sold'] += amount
+        self.oil_benefit['benefit'] += total_money
+
+    def sell_apt(self, price):
+        if price:
+            self.total_money += price
+            self.profit += price
+            self.property['apt'] = None
+
+    def sell_car(self, price):
+        if price:
+            self.total_money += price
+            self.profit += price
+            self.property['car'] = None
 
     def is_enough_money(self, amount):
         if self.total_money > amount:
@@ -460,11 +507,11 @@ class BankPanel(Panel):
         self.panel.refresh()
         curses.echo()
         amount = self.panel.getstr()
-        if self.validate_int(amount):
+        if validate_int(amount):
             self.panel.addstr(8, 2, 'На какой срок (1-11 месяцев)? ')
             curses.echo()
             term = self.panel.getstr()
-            if self.validate_int(term) and self.validate_month(term):
+            if validate_int(term) and validate_month(term):
                 self.user.new_deposit(int(amount), int(term))
         curses.noecho()
 
@@ -473,26 +520,13 @@ class BankPanel(Panel):
         self.panel.refresh()
         curses.echo()
         amount = self.panel.getstr()
-        if self.validate_int(amount):
+        if validate_int(amount):
             self.panel.addstr(8, 2, 'На какой срок (1-11 месяцев)? ')
             curses.echo()
             term = self.panel.getstr()
-            if self.validate_int(term) and self.validate_month(term):
+            if validate_int(term) and validate_month(term):
                 self.user.new_loan(int(amount), int(term))
         curses.noecho()
-
-    @staticmethod
-    def validate_int(inp):
-        if inp.isdigit():
-            return True
-        return False
-
-    @staticmethod
-    def validate_month(inp):
-        if 11 >= int(inp) >= 1:
-            return True
-        else:
-            return False
 
 
 class BankChoicePanel(Panel):
@@ -607,14 +641,14 @@ class MarketPanel(Panel):
             self.purchase_response(' Без денег не продаем! ')
 
 
-class StackExchangePanel(Panel, Observer):
+class StockExchangePanel(Panel, Observer):
     oil_price = 0
     land_price = 0
     prices = [None] * 12
     open = True
 
     def __init__(self, parent, height, width, begin_y, begin_x, *args, **kwargs):
-        super(StackExchangePanel, self).__init__(parent, height, width, begin_y, begin_x, *args, **kwargs)
+        super(StockExchangePanel, self).__init__(parent, height, width, begin_y, begin_x, *args, **kwargs)
         self.user = kwargs.get('user')
         self.update_prices(DATE.month)
 
@@ -685,7 +719,7 @@ class StackExchangePanel(Panel, Observer):
     def ask_for_land(self):
         curses.echo()
         amount = self.panel.getstr()
-        if self.validate_int(amount) and self.user.is_enough_money(int(amount) * self.land_price):
+        if validate_int(amount) and self.user.is_enough_money(int(amount) * self.land_price):
             self.user.buy_land(int(amount), self.land_price)
             curses.noecho()
         else:
@@ -696,7 +730,7 @@ class StackExchangePanel(Panel, Observer):
     def ask_for_oil(self):
         curses.echo()
         amount = self.panel.getstr()
-        if self.validate_int(amount) and self.user.is_enough_money(int(amount) * self.oil_price):
+        if validate_int(amount) and self.user.is_enough_money(int(amount) * self.oil_price):
             self.user.buy_oil(int(amount), self.oil_price)
             curses.noecho()
         else:
@@ -704,16 +738,154 @@ class StackExchangePanel(Panel, Observer):
             self.not_enough_money()
             return
 
-    def validate_int(self, amount):
-        if amount.isdigit():
-            return True
-        return False
-
     def update(self, date):
         if date.month == 1 and date.day == 1:
             self.prices.clear()
         if date.day == 1:
             self.update_prices(date.month)
+
+
+class PropertyPanel(Panel):
+
+    def __init__(self, parent, height, width, begin_y, begin_x, *args, **kwargs):
+        super(PropertyPanel, self).__init__(parent, height, width, begin_y, begin_x, *args, **kwargs)
+        self.user = kwargs.get('user')
+        self.market = kwargs.get('market')
+        self.se = kwargs.get('stock_exchange')
+
+    def add_content(self):
+        self.panel.clear()
+        self.panel.box(curses.ACS_VLINE, curses.ACS_HLINE)
+        self.panel.bkgd(' ', curses.color_pair(6))
+        title = ' Ваша собственность '
+        col1_title = 'Наименование'
+        col2_title = 'Цена'
+        user_actions = 'ESC - выход без продажи; D, A, Z, N - продажа'
+        apt_price = self.market.apartments.get(self.user.property['apt'], {}).get('price', 0)
+        car_price = self.market.cars.get(self.user.property['car'], {}).get('price', 0)
+        self.panel.addstr(0, self.width // 2 - len(title) // 2, title, curses.color_pair(5) | curses.A_BOLD)
+        self.panel.addstr(1, 5, col1_title, curses.color_pair(5) | curses.A_BOLD)
+        self.panel.addstr(1, self.width - len(col2_title) - 25, col2_title, curses.color_pair(5) | curses.A_BOLD)
+        self.panel.addstr(2, 1, "_" * (self.width - 25), curses.color_pair(5) | curses.A_BOLD)
+        self.panel.addstr(3, 1, 'D. ' + self.user.property['apt'], curses.color_pair(5) | curses.A_BOLD)
+        self.panel.addstr(3, self.width - len(col2_title) - 25, str(apt_price), curses.color_pair(5) | curses.A_BOLD)
+        self.panel.addstr(4, 1, 'A. Автомобиль ' + self.user.property['car'], curses.color_pair(5) | curses.A_BOLD)
+        self.panel.addstr(4, self.width - len(col2_title) - 25, str(car_price), curses.color_pair(5) | curses.A_BOLD)
+        self.panel.addstr(5, 1, 'Z. Земли ', curses.color_pair(5) | curses.A_BOLD)
+        self.panel.addstr(
+            5, self.width - len(col2_title) - 25, str(self.user.property['land']), curses.color_pair(5) | curses.A_BOLD
+        )
+        self.panel.addstr(6, 1, 'N. Нефти', curses.color_pair(5) | curses.A_BOLD)
+        self.panel.addstr(
+            6, self.width - len(col2_title) - 25, str(self.user.property['oil']), curses.color_pair(5) | curses.A_BOLD
+        )
+        self.panel.addstr(
+            8, 1, user_actions, curses.color_pair(7)
+        )
+        self.wait_for_key()
+        return
+
+    def wait_for_key(self):
+        key = self.panel.getch()
+        if key == KEY_ESC:
+            return
+        elif key == KEY_Z:
+            self.panel.addstr(9, 1, "Сколько акров: ", curses.color_pair(5) | curses.A_BOLD)
+            self.ask_for_land()
+        elif key == KEY_N:
+            self.panel.addstr(9, 1, "Сколько баррелей: ", curses.color_pair(5) | curses.A_BOLD)
+            self.ask_for_oil()
+        elif key == KEY_D:
+            self.user.sell_apt(self.market.apartments.get(self.user.property['apt'], {}).get('price', 0))
+        elif key == KEY_A:
+            self.user.sell_car(self.market.apartments.get(self.user.property['car'], {}).get('price', 0))
+
+    def ask_for_land(self):
+        curses.echo()
+        amount = self.panel.getstr()
+        if validate_int(amount) and self.user.property['land'] >= int(amount):
+            self.user.sell_land(int(amount), self.se.land_price)
+            curses.noecho()
+        else:
+            curses.noecho()
+            self.not_enough('land')
+            return
+
+    def ask_for_oil(self):
+        curses.echo()
+        amount = self.panel.getstr()
+        if validate_int(amount) and self.user.property['oil'] >= int(amount):
+            self.user.sell_oil(int(amount), self.se.oil_price)
+            curses.noecho()
+        else:
+            curses.noecho()
+            self.not_enough('oil')
+            return
+
+    def not_enough(self, item):
+        dct = {
+            'oil': 'У вас нет столько нефти',
+            'land': 'У вас нет столько земли'
+        }
+        title = " Простите "
+        message = dct[item]
+        width = len(message) + 7
+        height = 5
+        win = self.panel.derwin(height, width, self.height // 2 - height // 2, self.width // 2 - width // 2)
+        win.clear()
+        win.box(curses.ACS_VLINE, curses.ACS_HLINE)
+        win.addstr(0, width // 2 - len(title) // 2, title)
+        win.addstr(2, width // 2 - len(message) // 2, message)
+        win.keypad(1)
+        key = win.getch()
+        if key:
+            return
+
+
+class SecretaryPanel(Panel, Observer):
+
+    def __init__(self, parent, height, width, begin_y, begin_x, *args, **kwargs):
+        super(SecretaryPanel, self).__init__(parent, height, width, begin_y, begin_x, *args, **kwargs)
+        self.user = kwargs.get('user')
+        self.heat = random.randrange(*HEAT_RANGE)
+
+    def add_content(self):
+        self.panel.clear()
+        self.panel.box(curses.ACS_VLINE, curses.ACS_HLINE)
+        self.panel.bkgd(' ', curses.color_pair(6))
+        title = ' Секретарь '
+        msg = 'На отопление дома и энергетическую установку в этом месяце'
+        msg2 = 'понадобится %s баррл. нефти' % self.heat
+        birthday_msg = 'Ваш день рождения %s-%s' % (self.user.birthday.day, self.user.birthday.month,)
+        self.panel.addstr(0, self.width // 2 - len(title) // 2, title, curses.color_pair(5) | curses.A_BOLD)
+        self.panel.addstr(1, 1, msg, curses.color_pair(6) | curses.A_BOLD)
+        self.panel.addstr(2, 1, msg2, curses.color_pair(6) | curses.A_BOLD)
+        self.panel.addstr(3, 1, birthday_msg, curses.color_pair(6) | curses.A_BOLD)
+        self.panel.addstr(4, 1, '-' * (self.width - 20), curses.color_pair(6) | curses.A_BOLD)
+        columns = ('', 'Куплено', 'Продано', 'Результат')
+        oil_row = (
+            'Нефти', self.user.oil_benefit['bought'], self.user.oil_benefit['sold'], self.user.oil_benefit['benefit']
+        )
+        land_row = (
+            'Земли', self.user.land_benefit['bought'], self.user.land_benefit['sold'], self.user.land_benefit['benefit']
+        )
+        for i in range(len(columns)):
+            self.panel.addstr(
+                5, (self.width - 10) // 4 * (i + 1) - 8, columns[i], curses.color_pair(1)
+            )
+            self.panel.addstr(
+                6, (self.width - 10) // 4 * (i + 1) - 8, str(oil_row[i]), curses.color_pair(1)
+            )
+            self.panel.addstr(
+                7, (self.width - 10) // 4 * (i + 1) - 8, str(land_row[i]), curses.color_pair(1)
+            )
+        key = self.panel.getch()
+
+
+    def update(self, msg):
+        if msg.day == 1:
+            self.heat = random.randrange(*HEAT_RANGE)
+
 
 class Screen(Observer):
 
@@ -754,8 +926,24 @@ class Screen(Observer):
         self.market = MarketPanel(
             self, 12, self.width - 30, self.height // 2 - 4, 15, user=self.user
         )
-        self.stack_exchange = StackExchangePanel(
+        self.stock_exchange = StockExchangePanel(
             self, 11, self.width - 12, self.height // 2 - 5, 6, user=self.user
+        )
+        self.property = PropertyPanel(
+            self,
+            self.height // 2,
+            self.width - 16,
+            self.height // 2 - 4, 8,
+            user=self.user,
+            market=self.market.market,
+            stock_exchange=self.stock_exchange
+        )
+        self.secretary = SecretaryPanel(
+            self,
+            self.height // 2,
+            self.width - 16,
+            self.height // 2 - 4, 8,
+            user=self.user
         )
 
         self.panels.append(self.menu)
@@ -768,9 +956,9 @@ class Screen(Observer):
         self.options = {
             curses.KEY_F1: self.show_bank,
             curses.KEY_F2: self.show_market,
-            curses.KEY_F3: self.show_stack_exchange,
-            # curses.KEY_F4: self.show_property,
-            # curses.KEY_F9: self.show_secretary,
+            curses.KEY_F3: self.show_stock_exchange,
+            curses.KEY_F4: self.show_property,
+            curses.KEY_F9: self.show_secretary,
         }
 
     def update(self, msg):
@@ -825,14 +1013,26 @@ class Screen(Observer):
         self.disable_panel(self.market)
         self.panel.nodelay(YES)
 
-    def show_stack_exchange(self):
-        self.enable_panel(self.stack_exchange)
+    def show_stock_exchange(self):
+        self.enable_panel(self.stock_exchange)
         self.panel.nodelay(NO)
         curses.noecho()
-        self.disable_panel(self.stack_exchange)
+        self.disable_panel(self.stock_exchange)
         self.panel.nodelay(YES)
 
+    def show_property(self):
+        self.enable_panel(self.property)
+        self.panel.nodelay(NO)
+        curses.noecho()
+        self.disable_panel(self.property)
+        self.panel.nodelay(YES)
 
+    def show_secretary(self):
+        self.enable_panel(self.secretary)
+        self.panel.nodelay(NO)
+        curses.noecho()
+        self.disable_panel(self.secretary)
+        self.panel.nodelay(YES)
 
 def main(stdscr):
     # Hide cursor
@@ -845,7 +1045,7 @@ def main(stdscr):
     date_counter.register(screen.user)
     date_counter.register(screen.user.bank)
     date_counter.register(screen.finance)
-    date_counter.register(screen.stack_exchange)
+    date_counter.register(screen.stock_exchange)
     date_counter.register(screen)
     while True:
         time.sleep(1)
