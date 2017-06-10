@@ -1,9 +1,6 @@
 # -*- encoding: utf8 -*-
 
-import curses
-
-
-KEY_ENTER = 10
+from constants import *
 
 
 class Menu(object):
@@ -12,7 +9,7 @@ class Menu(object):
     highlighted_bg_color = curses.COLOR_WHITE
     highlighted_fg_color = curses.COLOR_BLACK
     deactivate_key = curses.KEY_RIGHT
-    exit_key = 27
+    exit_key = KEY_ESC
 
     def __init__(self, items, screen, begin_y, begin_x, active=True):
         self.items = items

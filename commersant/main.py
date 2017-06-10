@@ -4,7 +4,6 @@ import random
 import time
 
 from abc import ABCMeta, abstractmethod
-from collections import OrderedDict
 
 from constants import *
 from menu import Menu, MultipleMenu
@@ -12,24 +11,10 @@ from observer import Observable, Observer
 from utils import human_money, construct_date, validate_int, validate_month
 
 
-YES = 1
-NO = 0
+class Panel(object, metaclass=ABCMeta):
 
-MENU_OPTIONS = OrderedDict([
-    ('F1', 'Банк'),
-    ('F2', 'Рынок'),
-    ('F3', 'Биржа'),
-    ('F4', 'Хозяйство'),
-    ('F9', 'Секретарь'),
-    ('ESC', 'Выход'),
-])
-
-
-class Panel(metaclass=ABCMeta):
-
-    def __init__(self, parent, height, width, begin_y, begin_x, *args, **kwargs):
+    def __init__(self, height, width, begin_y, begin_x, *args, **kwargs):
         self.panel = None
-        self.parent = parent
         self.height = height
         self.width = width
         self.begin_y = begin_y
@@ -52,8 +37,6 @@ class Panel(metaclass=ABCMeta):
         return self.panel
 
     def hide(self):
-        self.parent.panel.touchwin()
-        self.parent.panel.refresh()
         self.panel = None
 
 
@@ -311,13 +294,14 @@ class MenuPanel(Panel):
             count_len += len(key) + 1 + len(self.options[key]) + 1
         return count_len
 
-    def __init__(self, parent, height, width, begin_y, begin_x, *args, **kwargs):
-        super(MenuPanel, self).__init__(parent, height, width, begin_y, begin_x, *args, **kwargs)
+    def __init__(self, height, width, begin_y, begin_x, *args, **kwargs):
+        super(MenuPanel, self).__init__(height, width, begin_y, begin_x, *args, **kwargs)
+        parent_width = kwargs.get('parent_width')
         self.options = kwargs.get('options')
         if self.options is None:
             self.options = MENU_OPTIONS
         self.width = self._count_width() + 4
-        self.begin_x = parent.width // 2 - self.width // 2
+        self.begin_x = parent_width // 2 - self.width // 2
 
     def add_content(self):
         if not self.panel:
@@ -339,8 +323,8 @@ class MenuPanel(Panel):
 
 class TaxPanel(Panel, Observer):
 
-    def __init__(self, parent, height, width, begin_y, begin_x, *args, **kwargs):
-        super(TaxPanel, self).__init__(parent, height, width, begin_y, begin_x, *args, **kwargs)
+    def __init__(self, height, width, begin_y, begin_x, *args, **kwargs):
+        super(TaxPanel, self).__init__(height, width, begin_y, begin_x, *args, **kwargs)
         self.loan_rate = INITIAL_LOAN_RATE
         self.deposit_rate = INITIAL_DEPOSIT_RATE
         self.income_tax = INITIAL_INCOME_TAX
@@ -369,8 +353,8 @@ class TaxPanel(Panel, Observer):
 
 class FinancePanel(Panel, Observer):
 
-    def __init__(self, parent, height, width, begin_y, begin_x, *args, **kwargs):
-        super(FinancePanel, self).__init__(parent, height, width, begin_y, begin_x, *args, **kwargs)
+    def __init__(self, height, width, begin_y, begin_x, *args, **kwargs):
+        super(FinancePanel, self).__init__(height, width, begin_y, begin_x, *args, **kwargs)
         self.user = kwargs.get('user')
         self.house_rate = INITIAL_HOUSE_RATE
         self.land_rate = INITIAL_LAND_RATE
@@ -407,8 +391,8 @@ class FinancePanel(Panel, Observer):
 
 class DatePanel(Panel, Observer):
 
-    def __init__(self, parent, height, width, begin_y, begin_x, *args, **kwargs):
-        super(DatePanel, self).__init__(parent, height, width, begin_y, begin_x, *args, **kwargs)
+    def __init__(self, height, width, begin_y, begin_x, *args, **kwargs):
+        super(DatePanel, self).__init__(height, width, begin_y, begin_x, *args, **kwargs)
         self.date = DATE
 
     def add_content(self):
@@ -425,16 +409,11 @@ class DatePanel(Panel, Observer):
         self.date = date
         self.show()
 
-    def hide(self):
-        self.main.touchwin()
-        self.main.refresh()
-        del self.panel
-
 
 class BankPanel(Panel):
 
-    def __init__(self, parent, height, width, begin_y, begin_x, *args, **kwargs):
-        super(BankPanel, self).__init__(parent, height, width, begin_y, begin_x, *args, **kwargs)
+    def __init__(self, height, width, begin_y, begin_x, *args, **kwargs):
+        super(BankPanel, self).__init__(height, width, begin_y, begin_x, *args, **kwargs)
         self.user = kwargs.get('user')
 
     @staticmethod
@@ -447,6 +426,12 @@ class BankPanel(Panel):
             if month <= 6:
                 return 4
             return 5
+
+    def show(self):
+        super(BankPanel, self).show()
+        key = self.panel.getch()
+        if key:
+            self.ask_for_choice()
 
     def add_content(self):
         if not self.panel:
@@ -501,28 +486,26 @@ class BankPanel(Panel):
                 self.user.new_loan(int(amount), int(term))
         curses.noecho()
 
-
-class BankChoicePanel(Panel):
-
-    def __init__(self, parent, height, width, begin_y, begin_x, *args, **kwargs):
-        super(BankChoicePanel, self).__init__(
-            parent, height, width, begin_y, begin_x, *args, **kwargs
-        )
-        self.question = kwargs.get('question')
-        self.title = kwargs.get('title')
-        self.width = len(self.question) + 2
-        self.begin_x = self.parent.width // 2 - len(self.question) // 2
-
-    def add_content(self):
-        self.panel.clear()
-        self.panel.box(curses.ACS_VLINE, curses.ACS_HLINE)
-        self.panel.bkgd(' ', curses.color_pair(CYAN_BLUE))
-        self.panel.addstr(
-            0, self.width // 2 - len(self.title) // 2, self.title, curses.color_pair(WHITE_BLUE)
-        )
-        self.panel.addstr(
-            2, self.width // 2 - len(self.question) // 2, self.question, curses.color_pair(WHITE_BLUE)
-        )
+    def ask_for_choice(self):
+        title = ' Вы хотите '
+        question = 'взять [1] или дать [0] деньги под проценты?'
+        width = len(question) + 4
+        choice_panel = self.panel.derwin(5, width, self.height // 2 - 3, self.width // 2 - width // 2)
+        choice_panel.touchwin()
+        choice_panel.clear()
+        choice_panel.box(curses.ACS_VLINE, curses.ACS_HLINE)
+        choice_panel.addstr(0, width // 2 - len(title) // 2, title, WHITE_BLUE)
+        choice_panel.addstr(2, width // 2 - len(question) // 2, question, WHITE_BLUE)
+        key = choice_panel.getch()
+        del choice_panel
+        self.panel.touchwin()
+        self.add_content()
+        if key == KEY_0:
+            self.ask_for_deposit()
+        elif key == KEY_1:
+            self.ask_for_loan()
+        else:
+            self.hide()
 
 
 class MarketMenu(Menu):
@@ -533,14 +516,13 @@ class MarketMenu(Menu):
 
 
 class MarketAptMenu(MarketMenu):
-    activate_btn = curses.KEY_RIGHT
-    deactivate_btn = curses.KEY_LEFT
+    deactivate_key = curses.KEY_LEFT
 
 
 class MarketPanel(Panel):
 
-    def __init__(self, parent, height, width, begin_y, begin_x, *args, **kwargs):
-        super(MarketPanel, self).__init__(parent, height, width, begin_y, begin_x, *args, **kwargs)
+    def __init__(self, height, width, begin_y, begin_x, *args, **kwargs):
+        super(MarketPanel, self).__init__(height, width, begin_y, begin_x, *args, **kwargs)
         self.user = kwargs.get('user')
         self.title = ' Рынок '
         self.market = Market()
@@ -620,8 +602,8 @@ class StockExchangePanel(Panel, Observer):
     prices = [None] * 12
     open = True
 
-    def __init__(self, parent, height, width, begin_y, begin_x, *args, **kwargs):
-        super(StockExchangePanel, self).__init__(parent, height, width, begin_y, begin_x, *args, **kwargs)
+    def __init__(self, height, width, begin_y, begin_x, *args, **kwargs):
+        super(StockExchangePanel, self).__init__(height, width, begin_y, begin_x, *args, **kwargs)
         self.user = kwargs.get('user')
         self.update_prices(DATE.month)
 
@@ -720,8 +702,8 @@ class StockExchangePanel(Panel, Observer):
 
 class PropertyPanel(Panel):
 
-    def __init__(self, parent, height, width, begin_y, begin_x, *args, **kwargs):
-        super(PropertyPanel, self).__init__(parent, height, width, begin_y, begin_x, *args, **kwargs)
+    def __init__(self, height, width, begin_y, begin_x, *args, **kwargs):
+        super(PropertyPanel, self).__init__(height, width, begin_y, begin_x, *args, **kwargs)
         self.user = kwargs.get('user')
         self.market = kwargs.get('market')
         self.se = kwargs.get('stock_exchange')
@@ -817,8 +799,8 @@ class PropertyPanel(Panel):
 
 class SecretaryPanel(Panel, Observer):
 
-    def __init__(self, parent, height, width, begin_y, begin_x, *args, **kwargs):
-        super(SecretaryPanel, self).__init__(parent, height, width, begin_y, begin_x, *args, **kwargs)
+    def __init__(self, height, width, begin_y, begin_x, *args, **kwargs):
+        super(SecretaryPanel, self).__init__(height, width, begin_y, begin_x, *args, **kwargs)
         self.user = kwargs.get('user')
         self.heat = random.randrange(*HEAT_RANGE)
 
@@ -878,23 +860,22 @@ class Screen(Observer):
         self.panel.refresh()
 
         self.user = User('Ksenia')
-        self.menu = MenuPanel(self, 1, 1, self.height - 1, 2)
-        self.date = DatePanel(self, 4, self.side_panel_width, 2, 2)
-        self.tax = TaxPanel(self, 6, self.side_panel_width, 7, 2)
+        self.menu = MenuPanel(1, 1, self.height - 1, 2, parent_width=self.width)
+        self.date = DatePanel(4, self.side_panel_width, 2, 2)
+        self.tax = TaxPanel(6, self.side_panel_width, 7, 2)
         self.finance = FinancePanel(
-            self, 9, self.width // 2 - 1, 2, self.width // 2, user=self.user
+            9, self.width // 2 - 1, 2, self.width // 2, user=self.user
         )
         self.bank = BankPanel(
-            self, self.height // 2, self.width - 8, self.height // 2 - 4, 4, user=self.user
+            self.height // 2, self.width - 8, self.height // 2 - 4, 4, user=self.user
         )
         self.market = MarketPanel(
-            self, 12, self.width - 30, self.height // 2 - 4, 15, user=self.user
+            12, self.width - 30, self.height // 2 - 4, 15, user=self.user
         )
         self.stock_exchange = StockExchangePanel(
-            self, 11, self.width - 12, self.height // 2 - 5, 6, user=self.user
+            11, self.width - 12, self.height // 2 - 5, 6, user=self.user
         )
         self.property = PropertyPanel(
-            self,
             self.height // 2,
             self.width - 16,
             self.height // 2 - 4, 8,
@@ -903,7 +884,6 @@ class Screen(Observer):
             stock_exchange=self.stock_exchange
         )
         self.secretary = SecretaryPanel(
-            self,
             self.height // 2,
             self.width - 16,
             self.height // 2 - 4, 8,
@@ -932,6 +912,9 @@ class Screen(Observer):
         if panel in self.panels:
             self.panels.remove(panel)
             panel.hide()
+        self.panel.touchwin()
+        self.panel.refresh()
+
         self.update_panels()
 
     def enable_panel(self, panel):
@@ -946,29 +929,9 @@ class Screen(Observer):
     def show_bank(self):
         self.enable_panel(self.bank)
         self.panel.nodelay(NO)
-        key = self.panel.getch()
-        if key:
-            title = ' Вы хотите '
-            question = 'взять [1] или дать [0] деньги под проценты?'
-            choice_panel = BankChoicePanel(
-                self, 5, 1, self.height // 2, 1, question=question, title=title
-            )
-            self.panels.append(choice_panel)
-            self.update_panels()
-            key = self.panel.getch()
-            if key == KEY_0:
-                self.disable_panel(choice_panel)
-                curses.noecho()
-                self.bank.ask_for_deposit()
-            elif key == KEY_1:
-                self.disable_panel(choice_panel)
-                curses.noecho()
-                self.bank.ask_for_loan()
-            else:
-                curses.noecho()
-                self.disable_panel(choice_panel)
-        self.panel.nodelay(YES)
+        curses.noecho()
         self.disable_panel(self.bank)
+        self.panel.nodelay(YES)
 
     def show_market(self):
         self.enable_panel(self.market)

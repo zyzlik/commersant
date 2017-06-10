@@ -1,5 +1,6 @@
 # -*- encoding: utf8 -*-
 
+KEY_ENTER = 10
 KEY_ESC = 27
 KEY_0 = 48
 KEY_1 = 49
