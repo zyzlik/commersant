@@ -6,36 +6,15 @@ import time
 
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
-from datetime import date, timedelta
 
+from constants import *
 from menu import Menu, MultipleMenu
 from observer import Observable, Observer
 from utils import human_money, construct_date, validate_int, validate_month
 
 
-DATE = date(2017, 1, 1)
-TIMEDELTA = timedelta(days=1)
-
 YES = 1
 NO = 0
-
-INITIAL_LOAN_RATE = 10
-INITIAL_DEPOSIT_RATE = 8
-RATE_SCATTER = (5, 15)
-INITIAL_INCOME_TAX = 5
-INITIAL_REPLACEMENT_COST = 19
-
-INITIAL_INCOME = 0
-INITIAL_LAND_RATE = 10
-INITIAL_HOUSE_RATE = 10
-
-KEY_0 = 48
-KEY_1 = 49
-KEY_ESC = 27
-KEY_Z = 122
-KEY_N = 110
-KEY_D = 100
-KEY_A = 97
 
 MENU_OPTIONS = OrderedDict([
     ('F1', 'Банк'),
@@ -45,11 +24,6 @@ MENU_OPTIONS = OrderedDict([
     ('F9', 'Секретарь'),
     ('ESC', 'Выход'),
 ])
-
-OIL_PRICE_RANGE = (15, 40)
-LAND_PRICE_RANGE = (150, 450)
-
-HEAT_RANGE = (2, 16)
 
 
 class Panel(metaclass=ABCMeta):
@@ -96,8 +70,8 @@ class Bank(Observer):
 
     def update(self, date):
         if date.day == 1:
-            self.loan_rate = random.randint(*RATE_SCATTER)
-            self.deposit_rate = random.randint(*RATE_SCATTER)
+            self.loan_rate = random.randint(*BANK_RATE_RANGE)
+            self.deposit_rate = random.randint(*BANK_RATE_RANGE)
 
     def update_deposits(self, deposits):
         for month, money in deposits.items():
@@ -352,19 +326,19 @@ class MenuPanel(Panel):
         count_len = 0
         for key in self.options:
             count_len += len(key) + 1 + len(self.options[key]) + 1
-        self.panel.bkgd(' ', curses.color_pair(2))
+        self.panel.bkgd(' ', curses.color_pair(BLACK_WHITE))
         y = 0
         x = 2
         for key in self.options:
             s = '%s' % (key)
-            self.panel.addstr(y, x, s, curses.color_pair(3))
+            self.panel.addstr(y, x, s, curses.color_pair(RED_WHITE))
             x += len(s)
             s = ':%s ' % (self.options[key])
             self.panel.addstr(y, x, s)
             x += len(s)
 
 
-class TaxPanel(Observer, Panel):
+class TaxPanel(Panel, Observer):
 
     def __init__(self, parent, height, width, begin_y, begin_x, *args, **kwargs):
         super(TaxPanel, self).__init__(parent, height, width, begin_y, begin_x, *args, **kwargs)
@@ -377,7 +351,7 @@ class TaxPanel(Observer, Panel):
         if not self.panel:
             self.create_panel()
         self.panel.clear()
-        self.panel.bkgd(' ', curses.color_pair(4))
+        self.panel.bkgd(' ', curses.color_pair(BLACK_CYAN))
         self.panel.box(curses.ACS_VLINE, curses.ACS_HLINE)
         loan_rate_str = 'Процент под кредит: %s' % self.loan_rate
         deposit_rate_str = 'Процент под долг: %s' % self.deposit_rate
@@ -394,7 +368,7 @@ class TaxPanel(Observer, Panel):
             self.show()
 
 
-class FinancePanel(Observer, Panel):
+class FinancePanel(Panel, Observer):
 
     def __init__(self, parent, height, width, begin_y, begin_x, *args, **kwargs):
         super(FinancePanel, self).__init__(parent, height, width, begin_y, begin_x, *args, **kwargs)
@@ -406,7 +380,7 @@ class FinancePanel(Observer, Panel):
         if not self.panel:
             self.create_panel()
         self.panel.clear()
-        self.panel.bkgd(' ', curses.color_pair(4))
+        self.panel.bkgd(' ', curses.color_pair(BLACK_CYAN))
         self.panel.box(curses.ACS_VLINE, curses.ACS_HLINE)
         height, width = self.panel.getmaxyx()
         money_str = 'У вас на счету: %s %s' % (
@@ -432,7 +406,7 @@ class FinancePanel(Observer, Panel):
         pass
 
 
-class DatePanel(Observer, Panel):
+class DatePanel(Panel, Observer):
 
     def __init__(self, parent, height, width, begin_y, begin_x, *args, **kwargs):
         super(DatePanel, self).__init__(parent, height, width, begin_y, begin_x, *args, **kwargs)
@@ -442,7 +416,7 @@ class DatePanel(Observer, Panel):
         self.panel.clear()
         date_str = 'Сегодня: %s' % self.date.strftime('%d-%b-%Y')
         weekday_str = self.date.strftime('%A')
-        self.panel.bkgd(' ', curses.color_pair(4))
+        self.panel.bkgd(' ', curses.color_pair(BLACK_CYAN))
         self.panel.box(curses.ACS_VLINE, curses.ACS_HLINE)
         self.panel.addstr(1, self.width // 2 - len(date_str) // 2, date_str)
         self.panel.addstr(2, self.width // 2 - len(weekday_str) // 2, weekday_str)
@@ -479,7 +453,7 @@ class BankPanel(Panel):
         if not self.panel:
             self.create_panel()
         self.panel.clear()
-        self.panel.bkgd(' ', curses.color_pair(5))
+        self.panel.bkgd(' ', curses.color_pair(WHITE_BLUE))
         self.panel.box(curses.ACS_VLINE, curses.ACS_HLINE)
         bank_name = ' Банк Ivanov & Co. '
         self.panel.addstr(0, self.width // 2 - len(bank_name) // 2, bank_name)
@@ -543,12 +517,12 @@ class BankChoicePanel(Panel):
     def add_content(self):
         self.panel.clear()
         self.panel.box(curses.ACS_VLINE, curses.ACS_HLINE)
-        self.panel.bkgd(' ', curses.color_pair(6))
+        self.panel.bkgd(' ', curses.color_pair(CYAN_BLUE))
         self.panel.addstr(
-            0, self.width // 2 - len(self.title) // 2, self.title, curses.color_pair(5)
+            0, self.width // 2 - len(self.title) // 2, self.title, curses.color_pair(WHITE_BLUE)
         )
         self.panel.addstr(
-            2, self.width // 2 - len(self.question) // 2, self.question, curses.color_pair(5)
+            2, self.width // 2 - len(self.question) // 2, self.question, curses.color_pair(WHITE_BLUE)
         )
 
 
@@ -584,27 +558,27 @@ class MarketPanel(Panel):
         self.panel.clear()
         self.panel.box(curses.ACS_VLINE, curses.ACS_HLINE)
         self.panel.addstr("")
-        self.panel.bkgd(' ', curses.color_pair(6))
+        self.panel.bkgd(' ', curses.color_pair(CYAN_BLUE))
         self.panel.addstr(
-            0, self.width // 2 - len(title) // 2, title, curses.color_pair(5)
+            0, self.width // 2 - len(title) // 2, title, curses.color_pair(WHITE_BLUE)
         )
         self.panel.addstr(
-            self.height // 2 - 1, self.width // 2 - len(response) // 2, response, curses.color_pair(5)
+            self.height // 2 - 1, self.width // 2 - len(response) // 2, response, curses.color_pair(WHITE_BLUE)
         )
 
     def add_content(self):
         self.panel.clear()
         self.panel.box(curses.ACS_VLINE, curses.ACS_HLINE)
-        self.panel.bkgd(' ', curses.color_pair(6))
+        self.panel.bkgd(' ', curses.color_pair(CYAN_BLUE))
         self.panel.addstr(
-            0, self.width // 2 - len(self.title) // 2, self.title, curses.color_pair(5)
+            0, self.width // 2 - len(self.title) // 2, self.title, curses.color_pair(WHITE_BLUE)
         )
         table_headers = ('А. Автомобили', 'D. Дома')
         self.panel.addstr(
-            1, 2, table_headers[0], curses.color_pair(7)
+            1, 2, table_headers[0], curses.color_pair(MAGENTA_BLUE)
         )
         self.panel.addstr(
-            1, self.width - 10 - len(table_headers[1]), table_headers[1], curses.color_pair(7)
+            1, self.width - 10 - len(table_headers[1]), table_headers[1], curses.color_pair(MAGENTA_BLUE)
         )
 
         # Make strings for menu
@@ -668,23 +642,23 @@ class StockExchangePanel(Panel, Observer):
     def add_content(self):
         self.panel.clear()
         self.panel.box(curses.ACS_VLINE, curses.ACS_HLINE)
-        self.panel.bkgd(' ', curses.color_pair(6))
+        self.panel.bkgd(' ', curses.color_pair(CYAN_BLUE))
         title = ' Биржа '
-        self.panel.addstr(0, self.width // 2 - len(title) // 2, title, curses.color_pair(5) | curses.A_BOLD)
+        self.panel.addstr(0, self.width // 2 - len(title) // 2, title, curses.color_pair(WHITE_BLUE) | curses.A_BOLD)
         for month, coord in enumerate(range(5, self.width - 5, (self.width - 5) // 12 )):
-            self.panel.addstr(1, coord, str(month + 1), curses.color_pair(1))
+            self.panel.addstr(1, coord, str(month + 1), curses.color_pair(BLACK_BLUE))
             if self.prices[month] is not None:
-                self.panel.addstr(2, coord, str(self.prices[month][1]), curses.color_pair(5))
-                self.panel.addstr(3, coord, '{:>3}'.format(self.prices[month][0]), curses.color_pair(5))
-        self.panel.addstr(4, 1, '_' * (self.width - 10), curses.color_pair(5))
+                self.panel.addstr(2, coord, str(self.prices[month][1]), curses.color_pair(WHITE_BLUE))
+                self.panel.addstr(3, coord, '{:>3}'.format(self.prices[month][0]), curses.color_pair(WHITE_BLUE))
+        self.panel.addstr(4, 1, '_' * (self.width - 10), curses.color_pair(WHITE_BLUE))
         self.panel.addstr(
-            5, 1, 'Z. Земля   -   {} за акр'.format(self.land_price), curses.color_pair(9) | curses.A_BOLD
+            5, 1, 'Z. Земля   -   {} за акр'.format(self.land_price), curses.color_pair(YELLOW_BLUE) | curses.A_BOLD
         )
         self.panel.addstr(
-            6, 1, 'N. Нефть   -   {} за баррель'.format(self.oil_price), curses.color_pair(9) | curses.A_BOLD
+            6, 1, 'N. Нефть   -   {} за баррель'.format(self.oil_price), curses.color_pair(YELLOW_BLUE) | curses.A_BOLD
         )
         self.panel.addstr(
-            8, 1, 'ESC - выход без покупки; Z, N - покупка', curses.color_pair(9) | curses.A_BOLD
+            8, 1, 'ESC - выход без покупки; Z, N - покупка', curses.color_pair(YELLOW_BLUE) | curses.A_BOLD
         )
         self.wait_for_key()
 
@@ -693,10 +667,10 @@ class StockExchangePanel(Panel, Observer):
         if key == KEY_ESC:
             return
         elif key == KEY_Z:
-            self.panel.addstr(9, 1, "Сколько акров: ", curses.color_pair(9) | curses.A_BOLD)
+            self.panel.addstr(9, 1, "Сколько акров: ", curses.color_pair(YELLOW_BLUE) | curses.A_BOLD)
             self.ask_for_land()
         elif key == KEY_N:
-            self.panel.addstr(9, 1, "Сколько баррелей: ", curses.color_pair(9) | curses.A_BOLD)
+            self.panel.addstr(9, 1, "Сколько баррелей: ", curses.color_pair(YELLOW_BLUE) | curses.A_BOLD)
             self.ask_for_oil()
         else:
             self.wait_for_key()
@@ -756,31 +730,31 @@ class PropertyPanel(Panel):
     def add_content(self):
         self.panel.clear()
         self.panel.box(curses.ACS_VLINE, curses.ACS_HLINE)
-        self.panel.bkgd(' ', curses.color_pair(6))
+        self.panel.bkgd(' ', curses.color_pair(CYAN_BLUE))
         title = ' Ваша собственность '
         col1_title = 'Наименование'
         col2_title = 'Цена'
         user_actions = 'ESC - выход без продажи; D, A, Z, N - продажа'
         apt_price = self.market.apartments.get(self.user.property['apt'], {}).get('price', 0)
         car_price = self.market.cars.get(self.user.property['car'], {}).get('price', 0)
-        self.panel.addstr(0, self.width // 2 - len(title) // 2, title, curses.color_pair(5) | curses.A_BOLD)
-        self.panel.addstr(1, 5, col1_title, curses.color_pair(5) | curses.A_BOLD)
-        self.panel.addstr(1, self.width - len(col2_title) - 25, col2_title, curses.color_pair(5) | curses.A_BOLD)
-        self.panel.addstr(2, 1, "_" * (self.width - 25), curses.color_pair(5) | curses.A_BOLD)
-        self.panel.addstr(3, 1, 'D. ' + self.user.property['apt'], curses.color_pair(5) | curses.A_BOLD)
-        self.panel.addstr(3, self.width - len(col2_title) - 25, str(apt_price), curses.color_pair(5) | curses.A_BOLD)
-        self.panel.addstr(4, 1, 'A. Автомобиль ' + self.user.property['car'], curses.color_pair(5) | curses.A_BOLD)
-        self.panel.addstr(4, self.width - len(col2_title) - 25, str(car_price), curses.color_pair(5) | curses.A_BOLD)
-        self.panel.addstr(5, 1, 'Z. Земли ', curses.color_pair(5) | curses.A_BOLD)
+        self.panel.addstr(0, self.width // 2 - len(title) // 2, title, curses.color_pair(WHITE_BLUE) | curses.A_BOLD)
+        self.panel.addstr(1, 5, col1_title, curses.color_pair(WHITE_BLUE) | curses.A_BOLD)
+        self.panel.addstr(1, self.width - len(col2_title) - 25, col2_title, curses.color_pair(WHITE_BLUE) | curses.A_BOLD)
+        self.panel.addstr(2, 1, "_" * (self.width - 25), curses.color_pair(WHITE_BLUE) | curses.A_BOLD)
+        self.panel.addstr(3, 1, 'D. ' + self.user.property['apt'], curses.color_pair(WHITE_BLUE) | curses.A_BOLD)
+        self.panel.addstr(3, self.width - len(col2_title) - 25, str(apt_price), curses.color_pair(WHITE_BLUE) | curses.A_BOLD)
+        self.panel.addstr(4, 1, 'A. Автомобиль ' + self.user.property['car'], curses.color_pair(WHITE_BLUE) | curses.A_BOLD)
+        self.panel.addstr(4, self.width - len(col2_title) - 25, str(car_price), curses.color_pair(WHITE_BLUE) | curses.A_BOLD)
+        self.panel.addstr(5, 1, 'Z. Земли ', curses.color_pair(WHITE_BLUE) | curses.A_BOLD)
         self.panel.addstr(
-            5, self.width - len(col2_title) - 25, str(self.user.property['land']), curses.color_pair(5) | curses.A_BOLD
+            5, self.width - len(col2_title) - 25, str(self.user.property['land']), curses.color_pair(WHITE_BLUE) | curses.A_BOLD
         )
-        self.panel.addstr(6, 1, 'N. Нефти', curses.color_pair(5) | curses.A_BOLD)
+        self.panel.addstr(6, 1, 'N. Нефти', curses.color_pair(WHITE_BLUE) | curses.A_BOLD)
         self.panel.addstr(
-            6, self.width - len(col2_title) - 25, str(self.user.property['oil']), curses.color_pair(5) | curses.A_BOLD
+            6, self.width - len(col2_title) - 25, str(self.user.property['oil']), curses.color_pair(WHITE_BLUE) | curses.A_BOLD
         )
         self.panel.addstr(
-            8, 1, user_actions, curses.color_pair(7)
+            8, 1, user_actions, curses.color_pair(MAGENTA_BLUE)
         )
         self.wait_for_key()
         return
@@ -790,10 +764,10 @@ class PropertyPanel(Panel):
         if key == KEY_ESC:
             return
         elif key == KEY_Z:
-            self.panel.addstr(9, 1, "Сколько акров: ", curses.color_pair(5) | curses.A_BOLD)
+            self.panel.addstr(9, 1, "Сколько акров: ", curses.color_pair(WHITE_BLUE) | curses.A_BOLD)
             self.ask_for_land()
         elif key == KEY_N:
-            self.panel.addstr(9, 1, "Сколько баррелей: ", curses.color_pair(5) | curses.A_BOLD)
+            self.panel.addstr(9, 1, "Сколько баррелей: ", curses.color_pair(WHITE_BLUE) | curses.A_BOLD)
             self.ask_for_oil()
         elif key == KEY_D:
             self.user.sell_apt(self.market.apartments.get(self.user.property['apt'], {}).get('price', 0))
@@ -852,16 +826,16 @@ class SecretaryPanel(Panel, Observer):
     def add_content(self):
         self.panel.clear()
         self.panel.box(curses.ACS_VLINE, curses.ACS_HLINE)
-        self.panel.bkgd(' ', curses.color_pair(6))
+        self.panel.bkgd(' ', curses.color_pair(CYAN_BLUE))
         title = ' Секретарь '
         msg = 'На отопление дома и энергетическую установку в этом месяце'
         msg2 = 'понадобится %s баррл. нефти' % self.heat
         birthday_msg = 'Ваш день рождения %s-%s' % (self.user.birthday.day, self.user.birthday.month,)
-        self.panel.addstr(0, self.width // 2 - len(title) // 2, title, curses.color_pair(5) | curses.A_BOLD)
-        self.panel.addstr(1, 1, msg, curses.color_pair(6) | curses.A_BOLD)
-        self.panel.addstr(2, 1, msg2, curses.color_pair(6) | curses.A_BOLD)
-        self.panel.addstr(3, 1, birthday_msg, curses.color_pair(6) | curses.A_BOLD)
-        self.panel.addstr(4, 1, '-' * (self.width - 20), curses.color_pair(6) | curses.A_BOLD)
+        self.panel.addstr(0, self.width // 2 - len(title) // 2, title, curses.color_pair(WHITE_BLUE) | curses.A_BOLD)
+        self.panel.addstr(1, 1, msg, curses.color_pair(CYAN_BLUE) | curses.A_BOLD)
+        self.panel.addstr(2, 1, msg2, curses.color_pair(CYAN_BLUE) | curses.A_BOLD)
+        self.panel.addstr(3, 1, birthday_msg, curses.color_pair(CYAN_BLUE) | curses.A_BOLD)
+        self.panel.addstr(4, 1, '-' * (self.width - 20), curses.color_pair(CYAN_BLUE) | curses.A_BOLD)
         columns = ('', 'Куплено', 'Продано', 'Результат')
         oil_row = (
             'Нефти', self.user.oil_benefit['bought'], self.user.oil_benefit['sold'], self.user.oil_benefit['benefit']
@@ -871,13 +845,13 @@ class SecretaryPanel(Panel, Observer):
         )
         for i in range(len(columns)):
             self.panel.addstr(
-                5, (self.width - 10) // 4 * (i + 1) - 8, columns[i], curses.color_pair(1)
+                5, (self.width - 10) // 4 * (i + 1) - 8, columns[i], curses.color_pair(BLACK_BLUE)
             )
             self.panel.addstr(
-                6, (self.width - 10) // 4 * (i + 1) - 8, str(oil_row[i]), curses.color_pair(1)
+                6, (self.width - 10) // 4 * (i + 1) - 8, str(oil_row[i]), curses.color_pair(BLACK_BLUE)
             )
             self.panel.addstr(
-                7, (self.width - 10) // 4 * (i + 1) - 8, str(land_row[i]), curses.color_pair(1)
+                7, (self.width - 10) // 4 * (i + 1) - 8, str(land_row[i]), curses.color_pair(BLACK_BLUE)
             )
         key = self.panel.getch()
 
@@ -897,20 +871,11 @@ class Screen(Observer):
 
         self.padding = 2
         self.side_panel_width = self.width // 2 - 2 * self.padding
-
-        curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_BLUE)
-        curses.init_pair(2, curses.COLOR_BLACK, curses.COLOR_WHITE)
-        curses.init_pair(3, curses.COLOR_RED, curses.COLOR_WHITE)
-        curses.init_pair(4, curses.COLOR_BLACK, curses.COLOR_CYAN)
-        curses.init_pair(5, curses.COLOR_WHITE, curses.COLOR_BLUE)
-        curses.init_pair(6, curses.COLOR_CYAN, curses.COLOR_BLUE)
-        curses.init_pair(7, curses.COLOR_MAGENTA, curses.COLOR_BLUE)
-        curses.init_pair(8, curses.COLOR_BLACK, curses.COLOR_WHITE)
-        curses.init_pair(9, curses.COLOR_YELLOW, curses.COLOR_BLUE)
+        init_colors()
 
         self.panels = []
 
-        self.panel.bkgd(curses.ACS_CKBOARD, curses.color_pair(2))
+        self.panel.bkgd(curses.ACS_CKBOARD, curses.color_pair(BLACK_WHITE))
         self.panel.refresh()
 
         self.user = User('Ksenia')
