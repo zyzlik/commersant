@@ -7,3 +7,4 @@ OIL_PRICE_RANGE = (15, 40)
 
 # Amount of oil needed for heating
 HEAT_RANGE = (2, 16)
+USER_MONEY_RANGE = (30000, 60000)

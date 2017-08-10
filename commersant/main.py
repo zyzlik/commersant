@@ -116,7 +116,7 @@ class User(Observer):
     def __init__(self, name):
         self.name = name
         self.scores = 0
-        self.total_money = 30000
+        self.total_money = random.randrange(*USER_MONEY_RANGE)
         self.property = {
             'apt': 'Живу у мамы',
             'car': '-',
@@ -157,8 +157,6 @@ class User(Observer):
             self.get_payment(date)
         if date in self.loans:
             self.pay_loan(date)
-        if date.day == 1:
-            self.profit = 0
 
     def get_payment(self, date):
         payment = self.deposits.pop(date)
@@ -285,6 +283,14 @@ class User(Observer):
             return True
         return False
 
+    def pay_income_tax(self, rate):
+        if self.profit > 0:
+            amount = self.profit * rate // 100
+            self.total_money -= amount
+            self.profit = - amount
+            return amount
+        self.profit = 0
+
 
 class MenuPanel(Panel):
 
@@ -329,6 +335,7 @@ class TaxPanel(Panel, Observer):
         self.deposit_rate = INITIAL_DEPOSIT_RATE
         self.income_tax = INITIAL_INCOME_TAX
         self.replacement_cost = INITIAL_REPLACEMENT_COST
+        self.user = kwargs.pop('user')
 
     def add_content(self):
         if not self.panel:
@@ -348,6 +355,7 @@ class TaxPanel(Panel, Observer):
 
     def update(self, date):
         if date.day == 1:
+            self.user.pay_income_tax(self.income_tax)
             self.show()
 
 
@@ -836,7 +844,6 @@ class SecretaryPanel(Panel, Observer):
             )
         key = self.panel.getch()
 
-
     def update(self, msg):
         if msg.day == 1:
             self.heat = random.randrange(*HEAT_RANGE)
@@ -862,7 +869,7 @@ class Screen(Observer):
         self.user = User('Ksenia')
         self.menu = MenuPanel(1, 1, self.height - 1, 2, parent_width=self.width)
         self.date = DatePanel(4, self.side_panel_width, 2, 2)
-        self.tax = TaxPanel(6, self.side_panel_width, 7, 2)
+        self.tax = TaxPanel(6, self.side_panel_width, 7, 2, user=self.user)
         self.finance = FinancePanel(
             9, self.width // 2 - 1, 2, self.width // 2, user=self.user
         )
@@ -960,6 +967,7 @@ class Screen(Observer):
         curses.noecho()
         self.disable_panel(self.secretary)
         self.panel.nodelay(YES)
+
 
 def main(stdscr):
     # Hide cursor
